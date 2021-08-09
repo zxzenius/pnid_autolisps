@@ -1,9 +1,12 @@
 ; =={ Batch Print }==
 ; A lisp version of batch print
 (defun c:bprint (/ selset idx borders border border-heights borders-for-sort 
-                 minheight
+                 minheight border-name
                 ) 
-  (setq selset (ssget '((2 . "Border.*") (0 . "INSERT"))))
+  ; border mode default(Block.Xindi) or custom
+  (setq g:custom-mode (LM:choose-mode))
+  (setq border-name (if g:custom-mode (LM:input-bordername) "Border.*"))
+  (setq selset (ssget (list (cons 2 border-name) (cons 0 "INSERT"))))
   (if selset 
     (progn 
       (setq idx 0)
@@ -152,6 +155,20 @@
 ;; Rounds 'n' to the nearest integer
 (defun LM:round (n) 
   (fix (+ n (if (minusp n) -0.5 0.5)))
+)
+
+(defun LM:choose-mode (/ mode) 
+  (initget "Default Custom")
+  (setq mode (cond 
+               ((getkword "\nBorder Mode [Default/Custom] <Default>:"))
+               ("Default")
+             )
+  )
+  (if (= mode "Custom") "Custom" nil)
+)
+
+(defun LM:input-bordername () 
+  (getstring "\nBorder name for matching:")
 )
 
 (vl-load-com)
