@@ -34,8 +34,7 @@
         )
       )
 
-      ; (princ "\n")
-      ; (princ borders)
+      (setq g:preview (bp:plot-mode))
       (bp:plot-borders borders)
     )
   )
@@ -81,8 +80,10 @@
   (setq p1 (bp:make-pt (bp:get-minpoint border)))
   (setq p2 (bp:make-pt (bp:get-maxpoint border)))
   (vla-setwindowtoplot activeLayout p1 p2)
-  (vla-displayplotpreview plot acFullPreview)
-  ; (vla-plottodevice plot)
+  (if g:preview 
+    (vla-displayplotpreview plot acFullPreview)
+    (vla-plottodevice plot)
+  )
 )
 
 (defun bp:config-paper-size (border) 
@@ -165,6 +166,16 @@
              )
   )
   (if (= mode "Custom") "Custom" nil)
+)
+
+(defun bp:plot-mode (/ mode) 
+  (initget "Plot preView")
+  (setq mode (cond 
+               ((getkword "\nPlot or Preview [Plot/preView] <Plot>:"))
+               ("Plot")
+             )
+  )
+  (if (= mode "preView") "preView" nil)
 )
 
 (defun LM:input-bordername () 
