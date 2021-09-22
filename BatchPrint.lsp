@@ -183,6 +183,6 @@
 )
 
 (vl-load-com)
-(princ "\n:: BatchPrint.lsp | Version 1.0 | \\U+00A9 zenius ")
+(princ "\n:: BatchPrint.lsp | Version 1.1 | \\U+00A9 zenius ")
 (princ "\n:: \"bprint\" to start ::")
 (princ)
