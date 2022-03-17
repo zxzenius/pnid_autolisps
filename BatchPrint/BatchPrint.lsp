@@ -3,7 +3,7 @@
 (defun c:bprint (/ selset idx borders border border-heights borders-for-sort 
                  minheight border-name
                 ) 
-  ; border mode default(Block.Xindi) or custom
+  ; border mode default(Border.*) or custom
   (setq g:custom-mode (LM:choose-mode))
   (setq border-name (if g:custom-mode (LM:input-bordername) "Border.*"))
   (setq selset (ssget (list (cons 2 border-name) (cons 0 "INSERT"))))
