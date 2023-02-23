@@ -46,6 +46,9 @@
         name     (vlax-get-property blockref 'EffectiveName)
   )
   (vla-getboundingbox blockref 'minpoint 'maxpoint)
+  ; The minpoint and maxpoint are in WCS, need be traslated to DCS for SetWindowToPlot method
+  (setq minpoint (bp:WCS->DCS minpoint))
+  (setq maxpoint (bp:WCS->DCS maxpoint))
   (setq minpoint (bp:pt->2d (vlax-safearray->list minpoint)))
   (setq maxpoint (bp:pt->2d (vlax-safearray->list maxpoint)))
   (list (cons "name" name) 
@@ -72,20 +75,32 @@
   (princ "\nFinished")
 )
 
-(defun bp:plot-border (border / acadObject acadDocument activeLayout plot p1 p2) 
-  (setq acadObject (vlax-get-Acad-object))
-  (setq acadDocument (vla-get-ActiveDocument acadObject))
+(defun bp:plot-border (border / acadDocument activeLayout plot p1 p2) 
+  (setq acadDocument (bp:get-acadDocument))
   (setq activeLayout (vla-Get-ActiveLayout acadDocument))
   (setq plot (vla-get-plot acadDocument))
   (setq p1 (bp:make-pt (bp:get-minpoint border)))
   (setq p2 (bp:make-pt (bp:get-maxpoint border)))
-  (vla-setwindowtoplot activeLayout p1 p2)
+  (vla-SetWindowToPlot activeLayout p1 p2)
   (if g:preview 
-    (vla-displayplotpreview plot acFullPreview)
-    (vla-plottodevice plot)
+    (vla-DisplayPlotPreview plot acFullPreview)
+    (vla-PlotToDevice plot)
   )
 )
 
+(defun bp:get-acadDocument (/ acadObject acadDocument)
+  (setq acadObject (vlax-get-Acad-object))
+  (setq acadDocument (vla-get-ActiveDocument acadObject))
+)
+
+; Translate the point in World UCS to Display coordinates
+(defun bp:WCS->DCS (point / acadDocument acadUtility)
+  (setq acadDocument (bp:get-acadDocument))
+  (setq acadUtility (vla-get-Utility acadDocument))
+  ; tranlatecoordinates return a variant 
+  (vlax-variant-value (vla-TranslateCoordinates acadUtility point acWorld acDisplayDCS :vlax-false))
+)
+  
 (defun bp:config-paper-size (border) 
   (setq name (cdr (assoc "name" border)))
   (cond 
@@ -183,6 +198,6 @@
 )
 
 (vl-load-com)
-(princ "\n:: BatchPrint.lsp | Version 1.1 | \\U+00A9 zenius ")
+(princ "\n:: BatchPrint.lsp | V1.2 | zenius")
 (princ "\n:: \"bprint\" to start ::")
 (princ)
