@@ -196,7 +196,8 @@
 (setq lb-gap 3)
 (princ
   (strcat
-    "\n:: LineBreak.lsp | V1.0 | zenius "
+    "\n:: LineBreak.lsp | V1.0 | zenius ::"
+    "\n:: A line break tool for P&ID :: "
     "\n:: \"CLBreak\" - Crossing Line Break | \"LBreak\" - One Line Break ::"
     "\n:: \"LBGap\" - Setting Line Break Gap ::"
     "\n:: Current Line Break Gap: " (rtos lb-gap)
