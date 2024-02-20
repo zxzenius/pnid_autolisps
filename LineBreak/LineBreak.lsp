@@ -13,14 +13,15 @@
     (princ)
   )
   
-  (setq line1 (z:select-line "\nSelect Line to Break:"))
+  (z:gap-info)
+  (setq line1 (z:select-line "\nSelect line to be broken [Gap]"))
   ; Highlight selected line
-  (redraw line1 3)
-  (setq line2 (z:select-line "\nSelect Crossing Line:"))
-  (redraw line1 4)
+  ; (redraw line1 3)
+  (setq line2 (z:select-line "\nSelect the crossing line: "))
+  ; (redraw line1 4)
   (LM:startundo (LM:acdoc))
   (setq lst (LM:intersections (vlax-ename->vla-object line1) (vlax-ename->vla-object line2)  acextendnone))
-  (foreach pnt (reverse lst)
+  (foreach pnt lst
     (z:make-gap line1 pnt lb-gap)
   )
   (LM:endundo (LM:acdoc))
@@ -41,37 +42,43 @@
     (princ)
   )
   
-  (setq line (z:select-line "\nSelect Line to Break: "))
-  (redraw line 3)
-  (if (setq pnt (getpoint "Select Break(Center) Point: "))
+  (z:gap-info)
+  (setq line (z:select-line "\nSelect line [Gap]"))
+  ; (redraw line 3)
+  (if (setq pnt 
+        (vlax-curve-getclosestpointto (vlax-ename->vla-object line) (getpoint "\nSpecify break point: "))
+      )
     (progn
-      (redraw line 4)
+      ; (redraw line 4)
       (LM:startundo (LM:acdoc))
       (z:make-gap line pnt lb-gap)
       (LM:endundo (LM:acdoc))
     )
-    (redraw line 4)
+    ; (redraw line 4)
   )
+  (princ)
 )
 
 
-;;--={ Line Break Gap }=--
-;;
-;; This program set default line break gap.
-;;
-(defun c:lbgap (/ default-gap val)
-  (setq default-gap lb-gap)
-  (if (setq val (getreal (strcat "\nEnter Line Break Gap [" (rtos lb-gap) "]:")))
-    (setq lb-gap val)
-    (setq lb-gap default-gap)
+(defun z:select-line (msg / sel ename with-opt)
+  (if
+    (and
+      (> (strlen msg) 1)
+      (= (substr msg (strlen msg) 1) "]")
+    )
+    (setq with-opt T)
+    (setq with-opt nil)
   )
-)
-
-(defun z:select-line (msg / sel ename)
   (while
     (not
       (progn
         (setvar 'errno 0)
+        (if with-opt
+          (progn
+            (initget "Gap")
+            (setq msg (strcat msg ": "))
+          )
+        )
         (setq sel
           (entsel msg)
         )
@@ -80,6 +87,10 @@
            (prompt "\nMissed, try again.")
           )
           ((null sel)
+           nil
+          )
+          ((= "Gap" sel)
+           (z:lbgap)
            nil
           )
           ((setq ename (car sel))
@@ -108,8 +119,6 @@
 )
 
 
-
-
 (defun z:entype (ename)
   (cdr (assoc 0 (entget ename)))
 )
@@ -126,45 +135,68 @@
 )
 
 
-(defun LM:intersections ( ob1 ob2 mod / lst rtn )
-    (if (and (vlax-method-applicable-p ob1 'intersectwith)
-             (vlax-method-applicable-p ob2 'intersectwith)
-             (setq lst (vlax-invoke ob1 'intersectwith ob2 mod))
-        )
-        (repeat (/ (length lst) 3)
-            (setq rtn (cons (list (car lst) (cadr lst) (caddr lst)) rtn)
-                  lst (cdddr lst)
-            )
-        )
+;; Intersections  -  Lee Mac
+;; Returns a list of all points of intersection between two objects.
+;; obj1,obj2 - [vla] VLA-Objects with intersectwith method applicable
+;; mode      - [int] acextendoption enum of intersectwith method
+;; Returns: [lst] List of 3D WCS intersection points, else nil
+
+(defun LM:intersections ( obj1 obj2 mode / lst rtn )
+  (setq lst (vlax-invoke obj1 'intersectwith obj2 mode))
+  (repeat (/ (length lst) 3)
+    (setq rtn (cons (list (car lst) (cadr lst) (caddr lst)) rtn)
+          lst (cdddr lst)
     )
-    (reverse rtn)
+  )
+  ; *zenius*
+  ; The order of the points is from-end-to-start of the obj1,
+  ; which is perfect for triming, no need to reverse.
+  ; (reverse rtn)
+  rtn
 )
 
 
-(defun z:make-gap (ename pnt gap / helper int lst cmd)
+(defun z:make-gap (ename pnt gap / helper cmd)
   (setq helper 
          (vlax-ename->vla-object 
            (entmakex (list '(0 . "CIRCLE") (cons 10 pnt) (cons 40 gap)))
          )
   )
-  (if (setq lst (LM:intersections (vlax-ename->vla-object ename) helper acextendnone))
-    (progn
-      (setq cmd (getvar 'cmdecho))
-      (setvar 'cmdecho 0)
-      (foreach int lst
-        (command-s
-          "_.break" (list ename pnt) "_F"
-          "_non" pnt
-          "_non" int
-        )
-      )
-      (setvar 'cmdecho cmd)
-    )
+  (setq cmd (getvar 'cmdecho))
+  (setvar 'cmdecho 0)
+  (command-s
+    "_.trim"
+    (vlax-vla-object->ename helper) ""
+    (list ename pnt)
+    ""
   )
+  (setvar 'cmdecho cmd)
   (vla-delete helper)
 )
 
 
+;;
+;; This program set line break gap.
+;;
+(defun z:lbgap (/ val)
+  (if (setq val (getreal (strcat "\nEnter Line Break Gap [" (rtos lb-gap) "]: ")))
+    (progn
+      (setq lb-gap val)
+      (z:gap-info)
+    )
+  )
+)
+
+
+(defun z:gap-info ()
+  (princ
+    (strcat
+      "\n:: Current Line Break Gap is <"
+      (rtos lb-gap) 
+      "> ::"
+    )
+  )
+)
 
 ;; Start Undo  -  Lee Mac
 ;; Opens an Undo Group.
@@ -192,15 +224,16 @@
 )
 
 
-(vl-load-com)
+;;; GLOBLE VAR - LINE BREAK GAP
 (setq lb-gap 3)
+;;;
+
+(vl-load-com)
 (princ
   (strcat
-    "\n:: LineBreak.lsp | V1.0 | zenius ::"
+    "\n:: LineBreak.lsp | V1.1 | zenius ::"
     "\n:: A line break tool for P&ID :: "
-    "\n:: \"CLBreak\" - Crossing Line Break | \"LBreak\" - One Line Break ::"
-    "\n:: \"LBGap\" - Setting Line Break Gap ::"
-    "\n:: Current Line Break Gap: " (rtos lb-gap)
+    "\n:: \"CLBreak\" - Crossing Line Break | \"LBreak\" - Single Line Break ::"
   )
 )
 (princ)
