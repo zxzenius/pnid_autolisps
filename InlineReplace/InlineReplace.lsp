@@ -2,28 +2,53 @@
 ; Replace target blockref with new block
 
 (vl-load-com)
-(princ "\n:: InlineBlockReplace.lsp | Version 1.0 | \\U+00A9 zenius ")
+(princ "\n:: InlineBlockReplace.lsp | Version 1.1 | \\U+00A9 zenius ")
 (princ "\n:: \"ibr\" to start ::")
 (princ)
 
-(defun c:ibr (/ selset bname blockref idx)
+(defun c:ibr (/ selset bname blockref idx old-name replaced)
   ; Emulate an entsel selection behaviour.
   (setq selset (ssget '((0 . "INSERT"))))
-  (if (> (sslength selset) 0)
+  (if (and selset (> (sslength selset) 0))
     (progn
       (setq bname (ibr:input-blockname))
       (setq idx 0)
+      (setq replaced nil)
       (repeat (sslength selset)
         (setq blockref (vlax-ename->vla-object (ssname selset idx)))
-        (ibr:replace blockref bname)
+        (setq old-name (ibr:replace blockref bname))
+        (if old-name
+          (setq replaced (cons old-name replaced))
+        )
         (setq idx (1+ idx))
       )
+      (ibr:report (reverse replaced) bname)
       (princ "\nFinished")
+    )
+  )
+  (princ)
+)
+
+(defun ibr:report (old-names bname / uniq)
+  (foreach name old-names
+    (if (not (member name uniq))
+      (setq uniq (cons name uniq))
+    )
+  )
+  (foreach name (reverse uniq)
+    (princ
+      (strcat "\n" name " -> " bname
+              " (x"
+              (itoa (length (vl-remove-if-not '(lambda (x) (= x name)) old-names)))
+              ")"
+      )
     )
   )
 )
 
-(defun ibr:replace (blockref bname / acadObject acadDocument mSpace new-blockref)
+; Returns the effective name of the replaced block, or nil on failure.
+(defun ibr:replace (blockref bname / acadObject acadDocument mSpace new-blockref result old-name)
+  (setq old-name (vla-get-effectivename blockref))
   (setq acadObject (vlax-get-Acad-object))
   (setq acadDocument (vla-get-ActiveDocument acadObject))
   (setq mSpace (vla-get-ModelSpace acadDocument))
@@ -37,18 +62,33 @@
                      )
   )
   (vla-put-layer new-blockref (vla-get-layer blockref))
-  (ibr:copy-attr blockref new-blockref)
-  (vla-delete blockref)
+  (setq result (vl-catch-all-apply 'ibr:copy-attr (list blockref new-blockref)))
+  (if (vl-catch-all-error-p result)
+    (progn
+      ; Roll back so a failed replacement leaves the original block untouched.
+      (vla-delete new-blockref)
+      (princ (strcat "\nAttribute copy failed: " (vl-catch-all-error-message result)))
+      nil
+    )
+    (progn
+      (vla-delete blockref)
+      old-name
+    )
+  )
 )
 
 (defun ibr:input-blockname ()
   (getstring "\nBlock name:")
 )
 
-(defun ibr:copy-attr (ref1 ref2 / attrs1)
-  (setq attrs1 (vlax-variant-value (vla-getattributes ref1)))
-  (foreach attr1 (vlax-safearray->list attrs1)
-    (LM:vl-setattributevalue ref2 (vla-get-tagstring attr1) (vla-get-textstring attr1))
+(defun ibr:copy-attr (ref1 ref2)
+  ; Skip when either side has no attributes, otherwise GetAttributes raises "Invalid index".
+  (if (and (= (vla-get-hasattributes ref1) :vlax-true)
+           (= (vla-get-hasattributes ref2) :vlax-true)
+      )
+    (foreach attr1 (vlax-invoke ref1 'getattributes)
+      (LM:vl-setattributevalue ref2 (vla-get-tagstring attr1) (vla-get-textstring attr1))
+    )
   )
 )
 
