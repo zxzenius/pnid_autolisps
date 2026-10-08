@@ -2,7 +2,7 @@
 ; Replace target blockref with new block
 
 (vl-load-com)
-(princ "\n:: InlineBlockReplace.lsp | Version 1.1 | \\U+00A9 zenius ")
+(princ "\n:: InlineBlockReplace.lsp | Version 1.2 | \\U+00A9 zenius ")
 (princ "\n:: \"ibr\" to start ::")
 (princ)
 
@@ -12,18 +12,23 @@
   (if (and selset (> (sslength selset) 0))
     (progn
       (setq bname (ibr:input-blockname))
-      (setq idx 0)
-      (setq replaced nil)
-      (repeat (sslength selset)
-        (setq blockref (vlax-ename->vla-object (ssname selset idx)))
-        (setq old-name (ibr:replace blockref bname))
-        (if old-name
-          (setq replaced (cons old-name replaced))
+      (if (tblsearch "BLOCK" bname)
+        (progn
+          (setq idx 0)
+          (setq replaced nil)
+          (repeat (sslength selset)
+            (setq blockref (vlax-ename->vla-object (ssname selset idx)))
+            (setq old-name (ibr:replace blockref bname))
+            (if old-name
+              (setq replaced (cons old-name replaced))
+            )
+            (setq idx (1+ idx))
+          )
+          (ibr:report (reverse replaced) bname)
+          (princ "\nFinished")
         )
-        (setq idx (1+ idx))
+        (princ (strcat "\nBlock \"" bname "\" not found in this drawing."))
       )
-      (ibr:report (reverse replaced) bname)
-      (princ "\nFinished")
     )
   )
   (princ)
@@ -82,13 +87,8 @@
 )
 
 (defun ibr:copy-attr (ref1 ref2)
-  ; Skip when either side has no attributes, otherwise GetAttributes raises "Invalid index".
-  (if (and (= (vla-get-hasattributes ref1) :vlax-true)
-           (= (vla-get-hasattributes ref2) :vlax-true)
-      )
-    (foreach attr1 (vlax-invoke ref1 'getattributes)
-      (LM:vl-setattributevalue ref2 (vla-get-tagstring attr1) (vla-get-textstring attr1))
-    )
+  (foreach attr1 (vlax-invoke ref1 'getattributes)
+    (LM:vl-setattributevalue ref2 (vla-get-tagstring attr1) (vla-get-textstring attr1))
   )
 )
 
